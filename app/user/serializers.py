@@ -34,7 +34,7 @@ class AuthTokenSerializer(serializers.Serializer):
 
         user = authenticate(
             request=self.context.get('request'),
-            username = email,
+            username=email,
             password=password,
         )
         if not user:
@@ -43,5 +43,3 @@ class AuthTokenSerializer(serializers.Serializer):
 
         attrs['user'] = user
         return attrs
-
-
