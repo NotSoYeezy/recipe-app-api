@@ -7,6 +7,7 @@ from rest_framework import status
 
 CREATE_USER_URL = reverse('user:create')
 TOKEN_URL = reverse('user:token')
+USER_OWN_URL = reverse('user:profile')
 
 
 def create_user(**params):
@@ -100,3 +101,48 @@ class PublicUserApiTest(TestCase):
         resp = self.client.post(TOKEN_URL, {'email': 'wrong', 'password': ''})
         self.assertNotIn('token', resp.data)
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_retrieve_user_unauthorized(self):
+        """Testing that auth is required for users"""
+        resp = self.client.get(USER_OWN_URL)
+
+        self.assertEqual(resp.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class PrivateUserApiTest(TestCase):
+    """Test API requests that require authentication"""
+
+    def setUp(self):
+        self.user = create_user(
+            email='test@test.pl',
+            password='testPassword',
+            name='Test Name'
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+
+    def test_retrieve_profile_success(self):
+        """Test retrieving profile for logged in user"""
+        resp = self.client.get(USER_OWN_URL)
+
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data, {
+            'name': self.user.name,
+            'email': self.user.email
+        })
+
+    def test_post_own_not_allowed(self):
+        """Test that POST request is not allowed on the user own url"""
+        resp = self.client.post(USER_OWN_URL, {})
+
+        self.assertEqual(resp.status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    def test_update_user_profile(self):
+        """Test that authenticated user can update his profile"""
+        patch_data = {'name': 'new Name', 'password': 'newPassword123'}
+        resp = self.client.patch(USER_OWN_URL, patch_data)
+
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.name, patch_data['name'])
+        self.assertTrue(self.user.check_password(patch_data['password']))
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
